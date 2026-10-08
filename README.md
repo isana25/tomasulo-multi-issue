@@ -7,6 +7,17 @@ forwarding, and one common data bus (CDB).
 This version adds **in-order multi-issue: 1 to 4 instructions per cycle**, set by
 `Issue width = N` in the input file (default 1).
 
+## Assignment Requirements
+The assignment asks for in-order multi-issue support (issue width 1 to 4) in an existing Tomasulo simulator. The table maps each requirement to its implementation.
+
+| # | Requirement | Where it is implemented | Status |
+|---|---|---|---|
+| 1 | In-order multi-issue, 1 to 4 instructions per cycle | `code/issue.py`: `issue()` loop over `issue_one()`; `code/commit.py`: `commit()` commits up to N per cycle | Done |
+| 2 | Issue width set in the input file with `Issue width = N` (default 1) | `code/init.py`: `parse_input()`; passed to issue and commit in `code/main.py` | Done |
+| 3 | Output: instruction status table, final register values, non-zero memory values | `code/commit.py`: `print_ROB()` prints each row; `code/main.py` prints total cycles, registers and memory | Done |
+| 4 | Test cases for different issue widths, with results in the report | `code/tests/` (16 inputs), `code/results/` (16 outputs), `code/run_tests.py`, `code/reference_check.py`; results in the report | Done |
+| 5 | Submit code, test cases, README and report to GitHub | This repository | Done |
+
 ## Implementation Overview
 - **Multi-issue:** the issue stage issues up to N instructions per cycle (N = 1 to 4), in program order. It stops early when the ROB, a reservation station or the load/store queue is full, or after a branch. Each instruction is renamed before the next one, so dependencies inside the same cycle are handled correctly.
 - **Multi-commit:** up to N instructions commit per cycle from the head of the ROB, in program order.
