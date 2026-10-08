@@ -1,4 +1,4 @@
-# Programming Assignment: Tomasulo Algorithm with Multi-Issue Support
+# Assignment 1 : Tomasulo Algorithm with Multi-Issue Support
 
 **Name:** Sana Ashfaq  
 **Course:** COSC6385 – Computer Architecture
