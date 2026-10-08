@@ -7,6 +7,28 @@ forwarding, and one common data bus (CDB).
 This version adds **in-order multi-issue: 1 to 4 instructions per cycle**, set by
 `Issue width = N` in the input file (default 1).
 
+## Implementation Overview
+- **Multi-issue:** the issue stage issues up to N instructions per cycle (N = 1 to 4), in program order. It stops early when the ROB, a reservation station or the load/store queue is full, or after a branch. Each instruction is renamed before the next one, so dependencies inside the same cycle are handled correctly.
+- **Multi-commit:** up to N instructions commit per cycle from the head of the ROB, in program order.
+- **Input file:** all settings (hardware table, ROB size, issue width, initial registers and memory, instructions) are read from one input file.
+- **Output:** the instruction status table, total cycles, final register values and non-zero memory values.
+- **Bug fixes in the provided code:** a unit could start two instructions in one cycle; a pipelined FP unit was advanced twice per cycle; a CDB broadcast could overwrite a newer register rename in the RAT; and the simulation could stop before the last store finished writing memory.
+- **Added:** `Beq` support, 16 test inputs (4 programs × widths 1–4), saved outputs for every run, and an automatic checker.
+
+## Evaluation Results
+All **16 of 16** test runs end with the correct final registers and memory, checked against a reference interpreter. With width 1, the output is identical to the original simulator.
+
+Total cycles:
+
+| Test | Width 1 | Width 2 | Width 3 | Width 4 |
+|---|---|---|---|---|
+| test1_loop | 38 | 35 | 36 | 36 |
+| test2_dependencies | 36 | 31 | 30 | 29 |
+| test3_memory_branches | 41 | 37 | 40 | 40 |
+| test4_small_rob | 24 | 21 | 21 | 21 |
+
+Going from width 1 to width 2 saves 3 to 5 cycles in every test. Wider issue helps only test 2, because the single CDB, one unit of each type and the stall at every branch become the bottleneck. Full timing tables are in `code/results/`, and the full discussion is in the report.
+
 ## Requirements
 Python 3. No extra packages.
 
