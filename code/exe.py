@@ -21,6 +21,19 @@ def check_valid_ins_in_rs(rs):
                 break
     return index
 
+# NEW: return the index of the OLDEST ready instruction in a reservation
+# station that was issued in an earlier cycle (-1 if none). Oldest = closest
+# to the head of the ROB.
+def oldest_ready_in_rs(rs, ROB, cycle):
+    best, best_pos = -1, None
+    for i in range(len(rs)):
+        if (rs[i].busy==1)&(rs[i].valid_1st==1)&(rs[i].valid_2nd==1):
+            pos = find_ROB_entry(ROB, rs[i].dest_tag)
+            if ROB[pos].issue[0] < cycle:
+                if (best_pos is None) or (pos < best_pos):
+                    best, best_pos = i, pos
+    return best
+
 # function: check ld_sd_queue and return valid instruction index
 def check_valid_ins_in_ldsd(ldsd):
     index = -1
@@ -110,8 +123,10 @@ def ld_sd_execution(ld_sd_exe, time_ld_sd_exe, ld_sd_queue, ROB, cycle):
                     break
             index = find_ROB_entry(ROB, element.dest_tag)
             ROB[index].exe.append(cycle)
-            # execute 
-            ld_sd_exe.cycle += 1
+        # execute (MODIFIED: the counter now advances every cycle; before,
+        # it only advanced in the first cycle, so an address calculation with
+        # more than 1 EX cycle never finished)
+        ld_sd_exe.cycle += 1
         # write address back to ld_sd_queue
         if ld_sd_exe.cycle == time_ld_sd_exe:
             address = ld_sd_exe.value1 + ld_sd_exe.value2
@@ -134,10 +149,12 @@ def exe(fu_int_adder, time_fu_int_adder,
         ld_sd_exe, time_ld_sd_exe, ld_sd_queue,
         cycle, ROB, PC):
     '''execution in fu and ld_sd address calculation'''
+    busy_ldsd = ld_sd_exe.busy == 1      # address adder (unpipelined) in use this cycle
     started_ldsd = ld_sd_execution(ld_sd_exe, time_ld_sd_exe, ld_sd_queue, ROB, cycle) 
     # functional units 
     # MODIFIED: remember if a unit already started an instruction this cycle;
     # a unit may start at most ONE instruction per cycle
+    busy_int = len(fu_int_adder) > 0      # unpipelined integer adder in use this cycle
     started_int = fu_exe(fu_int_adder, results_buffer, ROB, time_fu_int_adder, cycle, PC)
     started_fp_add = fu_exe(fu_fp_adder, results_buffer, ROB, time_fu_fp_adder, cycle, PC)
     started_fp_mul = fu_exe(fu_fp_multi, results_buffer, ROB, time_fu_fp_multi, cycle, PC)
@@ -152,37 +169,35 @@ def exe(fu_int_adder, time_fu_int_adder,
         ld_sd_exe.value1 = ld_sd_queue[index].reg_value
         ld_sd_exe.value2 = ld_sd_queue[index].immediate
         ld_sd_exe.dest_tag = ld_sd_queue[index].ld_sd_tag
-        # MODIFIED: only start now if the address adder did not already
-        # start another Ld/Sd this cycle
-        if (ROB[find_ROB_entry(ROB, ld_sd_queue[index].dest_tag)].issue[0] < cycle) & (not started_ldsd):
+        # MODIFIED: only start now if the address adder had no other Ld/Sd
+        # in it this cycle (it is unpipelined); otherwise it starts next cycle
+        if (ROB[find_ROB_entry(ROB, ld_sd_queue[index].dest_tag)].issue[0] < cycle) & (not busy_ldsd):
             ld_sd_execution(ld_sd_exe, time_ld_sd_exe, ld_sd_queue, ROB, cycle)
-    # from rs 
-    # int_adder
-    # fetch valid instruction 
-    if check_valid_ins_in_rs(rs_int_adder)>=0:
-        index = check_valid_ins_in_rs(rs_int_adder)
-        fu_int_adder.append(fu_entry())
-        add_entry_into_fu(fu_int_adder, rs_int_adder[index])
-        # check if it's a waiting instruction
-        if (ROB[find_ROB_entry(ROB, rs_int_adder[index].dest_tag)].issue[0] < cycle) & (not started_int):
+    # from rs (MODIFIED)
+    # An instruction leaves its reservation station only when it can start
+    # executing in this cycle, and the oldest ready instruction goes first.
+    # int_adder: UNPIPELINED -> it starts a new instruction only if it had
+    # no instruction in it at the start of this cycle
+    if not busy_int:
+        index = oldest_ready_in_rs(rs_int_adder, ROB, cycle)
+        if index >= 0:
+            fu_int_adder.append(fu_entry())
+            add_entry_into_fu(fu_int_adder, rs_int_adder[index])
             fu_exe(fu_int_adder, results_buffer, ROB, time_fu_int_adder, cycle, PC, only_new=True)
-        # remove ins from rs 
-        rs_int_adder[index].busy = 0
-    # fp_adder
-    if check_valid_ins_in_rs(rs_fp_adder)>=0:
-        index = check_valid_ins_in_rs(rs_fp_adder)
-        fu_fp_adder.append(fu_entry())
-        add_entry_into_fu(fu_fp_adder, rs_fp_adder[index])
-        if (ROB[find_ROB_entry(ROB, rs_fp_adder[index].dest_tag)].issue[0] < cycle) & (not started_fp_add):
+            rs_int_adder[index].busy = 0
+    # fp_adder: pipelined -> one new instruction per cycle
+    if not started_fp_add:
+        index = oldest_ready_in_rs(rs_fp_adder, ROB, cycle)
+        if index >= 0:
+            fu_fp_adder.append(fu_entry())
+            add_entry_into_fu(fu_fp_adder, rs_fp_adder[index])
             fu_exe(fu_fp_adder, results_buffer, ROB, time_fu_fp_adder, cycle, PC, only_new=True)
-        # remove ins from rs 
-        rs_fp_adder[index].busy = 0
-    # fp_multi
-    if check_valid_ins_in_rs(rs_fp_multi)>=0:
-        index = check_valid_ins_in_rs(rs_fp_multi)
-        fu_fp_multi.append(fu_entry())
-        add_entry_into_fu(fu_fp_multi, rs_fp_multi[index])
-        if (ROB[find_ROB_entry(ROB, rs_fp_multi[index].dest_tag)].issue[0] < cycle) & (not started_fp_mul):
+            rs_fp_adder[index].busy = 0
+    # fp_multi: pipelined -> one new instruction per cycle
+    if not started_fp_mul:
+        index = oldest_ready_in_rs(rs_fp_multi, ROB, cycle)
+        if index >= 0:
+            fu_fp_multi.append(fu_entry())
+            add_entry_into_fu(fu_fp_multi, rs_fp_multi[index])
             fu_exe(fu_fp_multi, results_buffer, ROB, time_fu_fp_multi, cycle, PC, only_new=True)
-        # remove ins from rs 
-        rs_fp_multi[index].busy = 0
+            rs_fp_multi[index].busy = 0

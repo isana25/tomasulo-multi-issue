@@ -19,6 +19,11 @@ if len(sys.argv) > 1:
 '''initialize'''
 config, reg_int, reg_fp, memory, instructions = parse_input(INPUT_FILE)
 issue_width = config['issue_width']
+# only 1 functional unit of each type is simulated
+for unit in ['int_adder', 'fp_adder', 'fp_multi', 'ld_sd']:
+    if config[unit]['fu'] != 1:
+        print('WARNING: ' + unit + ' has ' + str(config[unit]['fu']) +
+              ' FUs in the input file; this simulator uses 1')
 rat_int = list(reg_int)
 rat_fp = list(reg_fp)
 '''intialize reservation stations'''

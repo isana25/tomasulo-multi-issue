@@ -70,16 +70,24 @@ def check_if_sd_committable(ld_sd_queue, ROB):
             flag = True
     return flag
 
+# NEW: True if the first entry of the ld/sd queue is the head of the ROB
+def store_at_rob_head(ld_sd_queue, ROB):
+    return (len(ROB)>0) and (ld_sd_queue[0].dest_tag == ROB[0].ROB_tag)
+
 # function: mem 
 def mem(ld_sd_queue, ld_sd_mem, time_ld_sd_mem, results_buffer, 
         memory, ROB, cycle):
     '''look forward check for all Ld instructions'''
-    index = -1
+    # MODIFIED: the loop index is no longer overwritten inside the loop, and
+    # a load is forwarded only AFTER its address cycle (EX), not in it
     remove_list = []
-    for element in ld_sd_queue:
-        index += 1
-        if (index>=1)&(element.op=='Ld')&(element.ready==1):
-            data = forward_check_from_sd(ld_sd_queue, index)
+    for pos in range(len(ld_sd_queue)):
+        element = ld_sd_queue[pos]
+        if (pos>=1)&(element.op=='Ld')&(element.ready==1):
+            rob_pos = find_ROB_entry(ROB, element.dest_tag)
+            if ROB[rob_pos].exe[-1] >= cycle:
+                continue
+            data = forward_check_from_sd(ld_sd_queue, pos)
             if len(data)>0:
                 # Ld gets data 
                 results_buffer.append(fu_result())
@@ -127,8 +135,11 @@ def mem(ld_sd_queue, ld_sd_mem, time_ld_sd_mem, results_buffer,
         if (ld_sd_queue[0].op=='Sd'):
             # check if this Sd is ready and to be commited 
             if (ld_sd_queue[0].ready==1):
-                # check to be committed in next cycle
-                if (check_if_sd_committable):
+                # MODIFIED: a store writes memory only when it is at the head
+                # of the ROB (before, the check function was never called,
+                # so a store could write memory before older instructions
+                # had committed)
+                if store_at_rob_head(ld_sd_queue, ROB):
                     # already have data in Sd
                     if (type(ld_sd_queue[0].data)==int)|(type(ld_sd_queue[0].data)==float):
                         # put the Sd entry into ld_sd_mem
@@ -141,13 +152,13 @@ def mem(ld_sd_queue, ld_sd_mem, time_ld_sd_mem, results_buffer,
         if (flag_1st_ldsd_sent==False):
             for index in range(len(ld_sd_queue)):
                 # ready Ld
+                # MODIFIED: removed a check on ld_sd_queue[0].data (the head
+                # entry, not this load) that blocked every load while a store
+                # with data was at the head, even with a different address
                 if (ld_sd_queue[index].op=='Ld')&(ld_sd_queue[index].ready==1):
-                    # haven't got data
-                    if (type(ld_sd_queue[0].data)!=int)&(type(ld_sd_queue[0].data)!=float):
-                        # all previous Sd instructions are ready but no address match 
-                        if check_all_previous_Sd_no_match(ld_sd_queue, index): 
-                            put_entry_into_ld_sd_mem(ld_sd_mem, ld_sd_queue[index])
-                            ld_sd_queue.remove(ld_sd_queue[index])
-                            ld_sd_mem.busy =1
-                            break 
-
+                    # all previous Sd instructions are ready but no address match 
+                    if check_all_previous_Sd_no_match(ld_sd_queue, index): 
+                        put_entry_into_ld_sd_mem(ld_sd_mem, ld_sd_queue[index])
+                        ld_sd_queue.remove(ld_sd_queue[index])
+                        ld_sd_mem.busy =1
+                        break
