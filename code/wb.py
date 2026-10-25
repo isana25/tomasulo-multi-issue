@@ -75,3 +75,4 @@ def wb(cdb, rat_int, rat_fp,
             cdb.value = results_buffer[0].value
             cdb.dest_tag = results_buffer[0].dest_tag
             results_buffer.popleft()
+

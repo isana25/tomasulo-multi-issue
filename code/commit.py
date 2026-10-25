@@ -33,7 +33,7 @@ def commit(ROB, reg_int, reg_fp, cycle, instructions, issue_width=1):
     while (len(ROB)>0) & (committed<issue_width):
         op = instructions[ROB[0].PC].split(' ')[0]
         if (op=='Bne')|(op=='Beq'):
-            if len(ROB[0].exe)!=0:      # branch resolved
+            if len(ROB[0].exe)==2:      # branch resolved (EX finished)
                 entry = ROB.popleft()
                 print_ROB(entry, instructions)
                 continue

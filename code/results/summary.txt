@@ -1,0 +1,25 @@
+test1_loop_w1                cycles=  38   final state CORRECT   timing OK
+test1_loop_w2                cycles=  35   final state CORRECT   timing OK
+test1_loop_w3                cycles=  35   final state CORRECT   timing OK
+test1_loop_w4                cycles=  35   final state CORRECT   timing OK
+test2_dependencies_w1        cycles=  35   final state CORRECT   timing OK
+test2_dependencies_w2        cycles=  31   final state CORRECT   timing OK
+test2_dependencies_w3        cycles=  29   final state CORRECT   timing OK
+test2_dependencies_w4        cycles=  29   final state CORRECT   timing OK
+test3_memory_branches_w1     cycles=  41   final state CORRECT   timing OK
+test3_memory_branches_w2     cycles=  34   final state CORRECT   timing OK
+test3_memory_branches_w3     cycles=  33   final state CORRECT   timing OK
+test3_memory_branches_w4     cycles=  33   final state CORRECT   timing OK
+test4_small_rob_w1           cycles=  23   final state CORRECT   timing OK
+test4_small_rob_w2           cycles=  21   final state CORRECT   timing OK
+test4_small_rob_w3           cycles=  21   final state CORRECT   timing OK
+test4_small_rob_w4           cycles=  21   final state CORRECT   timing OK
+test5_latencies_w1           cycles=  46   final state CORRECT   timing OK
+test5_latencies_w2           cycles=  42   final state CORRECT   timing OK
+test5_latencies_w3           cycles=  41   final state CORRECT   timing OK
+test5_latencies_w4           cycles=  41   final state CORRECT   timing OK
+test6_branch_prediction_w1   cycles=  28   final state CORRECT   timing OK
+test6_branch_prediction_w2   cycles=  28   final state CORRECT   timing OK
+test6_branch_prediction_w3   cycles=  29   final state CORRECT   timing OK
+test6_branch_prediction_w4   cycles=  29   final state CORRECT   timing OK
+ALL TESTS PASSED

@@ -10,6 +10,7 @@
     -- don't remove ld/sd instructions
 '''
 from init import fu_entry, fu_result
+from predictor import update
 
 # function: check rs and return valid instruction index
 def check_valid_ins_in_rs(rs):
@@ -96,14 +97,16 @@ def fu_exe(fu, fu_results, ROB, time_fu, cycle, PC, only_new=False):
                     taken = fu[0].value1 != fu[0].value2
                 else:
                     taken = fu[0].value1 == fu[0].value2
-                if not taken:
-                    PC.PC += 1
-                    PC.valid = 1
-                else:
-                    index = find_ROB_entry(ROB, fu[0].dest_tag)
-                    offset = ROB[index].dest_tag
-                    PC.PC = int(PC.PC + 1 + offset/4)
-                    PC.valid = 1
+                # MODIFIED (branch prediction): compare the real outcome with
+                # the prediction, update the BTB, and flag a misprediction
+                index = find_ROB_entry(ROB, fu[0].dest_tag)
+                branch_pc = ROB[index].PC
+                offset = ROB[index].dest_tag
+                target = int(branch_pc + 1 + offset/4)
+                actual_next = target if taken else branch_pc + 1
+                update(PC.btb, branch_pc, taken, target)
+                if actual_next != ROB[index].pred_next:
+                    PC.mispredict = (fu[0].dest_tag, actual_next)
             else:
                 pass
             # remove from fu 

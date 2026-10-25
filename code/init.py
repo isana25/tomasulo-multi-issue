@@ -145,3 +145,4 @@ def build_rs(num):
         temp.busy = 0
         rs.extend([temp])
     return rs
+

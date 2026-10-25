@@ -10,6 +10,8 @@ from exe import exe
 from mem import mem
 from wb import wb
 from commit import commit
+from predictor import build_btb
+from recovery import squash
 
 '''input file (hardcoded; can be overridden: python3 main.py tests/xxx.txt)'''
 INPUT_FILE = 'test_case.txt'
@@ -57,6 +59,11 @@ cdb.valid = 0
 PC = PC()
 PC.PC = 0
 PC.valid = 1
+# NEW (branch prediction)
+PC.btb = build_btb()        # 8-entry BTB with 1-bit predictors
+PC.resume = 0               # no fetch before this cycle (misprediction repair)
+PC.mispredict = None        # (branch ROB tag, correct PC) when detected in EX
+PC.branch_issued = False
 cycle = 1
 MAX_CYCLES = 10000   # safety stop
 
@@ -77,7 +84,7 @@ while ((len(ROB)>0) | (PC.PC<len(instructions)) | (ld_sd_mem.busy==1)
     issue(cycle, PC, instructions, ROB, size_ROB,
           rs_int_adder, rs_fp_adder, rs_fp_multi,
           ld_sd_queue, size_ld_sd_queue,
-          rat_int, rat_fp, issue_width)
+          rat_int, rat_fp, issue_width, PC.btb)
 
     '''EXE stage'''
     exe(fu_int_adder, time_fu_int_adder,
@@ -86,6 +93,15 @@ while ((len(ROB)>0) | (PC.PC<len(instructions)) | (ld_sd_mem.busy==1)
         rs_int_adder, rs_fp_adder, rs_fp_multi,
         ld_sd_exe, time_ld_sd_exe, ld_sd_queue,
         cycle, ROB, PC)
+
+    '''NEW: misprediction found in EX -> squash the wrong path'''
+    if PC.mispredict is not None:
+        branch_tag, correct_pc = PC.mispredict
+        squash(branch_tag, correct_pc, cycle, PC, ROB, reg_int, reg_fp,
+               rat_int, rat_fp, rs_int_adder, rs_fp_adder, rs_fp_multi,
+               fu_int_adder, fu_fp_adder, fu_fp_multi,
+               ld_sd_queue, ld_sd_exe, ld_sd_mem, results_buffer, cdb)
+        PC.mispredict = None
 
     '''MEM stage'''
     mem(ld_sd_queue, ld_sd_mem, time_ld_sd_mem, results_buffer,
@@ -116,7 +132,7 @@ for name, regs in [('R', reg_int), ('F', reg_fp)]:
         vals = 'value:'.ljust(8)
         for i in range(start, start+8):
             head += (name+str(i)).ljust(8)
-            vals += str(regs[i]).ljust(8)
+            vals += (str(regs[i]) + ' ').ljust(8)   # always at least one space
         print(head)
         print(vals)
 print('')

@@ -8,6 +8,7 @@
 """
 from collections import namedtuple, deque
 from init import ld_sd_entry, ROB_entry
+from predictor import predict
 
 # function: find a tag for ld_sd_entry 
 def find_tag_new_ldsd_entry(ld_sd_queue, size_ld_sd_queue):
@@ -175,7 +176,7 @@ def issue_one(cycle, PC, instructions, ROB, size_ROB,
         rs_fp_adder, 
         rs_fp_multi, 
         ld_sd_queue, size_ld_sd_queue, 
-        rat_int, rat_fp):
+        rat_int, rat_fp, btb):
     issued = False
     # fetch 1 instruction 
     ins = instructions[PC.PC]
@@ -247,8 +248,15 @@ def issue_one(cycle, PC, instructions, ROB, size_ROB,
             # put ins into rs_int_adder
             index = check_rs_space(rs_int_adder)
             put_bne_into_rs(rs_int_adder, index, ins, rat_int, rat_fp, ROB)
-            # PC: stop fetching until the branch is resolved in EX
-            PC.valid = 0
+            # MODIFIED (branch prediction): predict the next PC with the
+            # 1-bit predictor + BTB instead of stopping fetch
+            taken, next_pc = predict(btb, PC.PC)
+            ROB[-1].pred_next = next_pc
+            # save a copy of the RAT, to restore it on a misprediction
+            ROB[-1].rat_int_copy = list(rat_int)
+            ROB[-1].rat_fp_copy = list(rat_fp)
+            PC.PC = next_pc
+            PC.branch_issued = True
             issued = True
     else:
         pass
@@ -261,15 +269,25 @@ def issue(cycle, PC, instructions, ROB, size_ROB,
         rs_fp_adder, 
         rs_fp_multi, 
         ld_sd_queue, size_ld_sd_queue, 
-        rat_int, rat_fp, issue_width=1):
+        rat_int, rat_fp, issue_width=1, btb=None):
+    # MODIFIED (branch prediction): no fetch while a misprediction is being
+    # repaired (fetch restarts in cycle PC.resume)
+    if cycle < PC.resume:
+        return
+    PC.branch_issued = False
     for slot in range(issue_width):
-        # end of program, or waiting for a branch to resolve
-        if (PC.PC >= len(instructions)) | (PC.valid == 0):
+        # end of program
+        if PC.PC >= len(instructions):
+            break
+        # a branch ends the issue group; fetch continues next cycle from the
+        # predicted address
+        if PC.branch_issued:
             break
         # each call renames one instruction and updates the RAT right away,
         # so the next instruction in the same cycle sees the new ROB tag
         if not issue_one(cycle, PC, instructions, ROB, size_ROB,
                          rs_int_adder, rs_fp_adder, rs_fp_multi,
-                         ld_sd_queue, size_ld_sd_queue, rat_int, rat_fp):
+                         ld_sd_queue, size_ld_sd_queue, rat_int, rat_fp, btb):
             # structural stall: in-order, so nothing behind it may issue
             break
+
