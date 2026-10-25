@@ -7,6 +7,8 @@
 3. remove entry in results queue
 
 '''
+from init import fu_result
+
 # function: find ROB entry by tag
 def find_ROB_entry(ROB, tag):
     for index in range(len(ROB)):
@@ -58,21 +60,24 @@ def boroadcast(cdb, rat_int, rat_fp,
             element.cdb.append(cycle)
 
 # function: wb 
+# MODIFIED (multiple write-backs): up to issue_width results are written back
+# (broadcast) per cycle, the same number as issued and committed per cycle.
+# cdb.slots holds the results that were put on the bus in the previous cycle.
 def wb(cdb, rat_int, rat_fp, 
         rs_int_adder, rs_fp_adder, rs_fp_multi,
         ld_sd_queue, ROB, cycle,
-        results_buffer):
-    # broadcast 
-    if cdb.valid == 1:
-        boroadcast(cdb, rat_int, rat_fp, 
+        results_buffer, issue_width=1):
+    # broadcast every result that is on the bus
+    for slot in cdb.slots:
+        boroadcast(slot, rat_int, rat_fp, 
                     rs_int_adder, rs_fp_adder, rs_fp_multi,
                     ld_sd_queue, ROB, cycle)
-        cdb.valid = 0
-    # fetch data from results queue
-    if cdb.valid == 0:
-        if len(results_buffer)>0:
-            cdb.valid = 1
-            cdb.value = results_buffer[0].value
-            cdb.dest_tag = results_buffer[0].dest_tag
-            results_buffer.popleft()
-
+    cdb.slots = []
+    # fetch up to issue_width results from the results queue, oldest first
+    while (len(results_buffer)>0) and (len(cdb.slots)<issue_width):
+        slot = fu_result()
+        slot.value = results_buffer[0].value
+        slot.dest_tag = results_buffer[0].dest_tag
+        cdb.slots.append(slot)
+        results_buffer.popleft()
+    cdb.valid = 1 if len(cdb.slots)>0 else 0

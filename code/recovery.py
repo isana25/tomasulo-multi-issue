@@ -55,8 +55,8 @@ def squash(branch_tag, correct_pc, cycle, PC, ROB, reg_int, reg_fp,
     for element in list(results_buffer):
         if element.dest_tag in wrong:
             results_buffer.remove(element)
-    if (cdb.valid == 1) and (cdb.dest_tag in wrong):
-        cdb.valid = 0
+    cdb.slots = [slot for slot in cdb.slots if slot.dest_tag not in wrong]
+    cdb.valid = 1 if len(cdb.slots)>0 else 0
 
     # 7. restore the RAT from the copy saved when the branch was issued.
     # A tag in the copy may belong to an older instruction that has already

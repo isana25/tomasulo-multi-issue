@@ -90,7 +90,7 @@ def check_timing(rows, config, width):
     for c, n in commits.items():
         if n > width: errors.append(str(n) + ' commits in cycle ' + str(c))
     for c, n in wbs.items():
-        if n > 1: errors.append(str(n) + ' CDB broadcasts in cycle ' + str(c))
+        if n > width: errors.append(str(n) + ' write-backs in cycle ' + str(c))
     return errors
 
 os.makedirs('results', exist_ok=True)

@@ -55,6 +55,7 @@ size_ROB = config['rob']
 results_buffer = deque()
 cdb = cdb()
 cdb.valid = 0
+cdb.slots = []    # NEW: results on the bus (up to issue_width per cycle)
 '''instruction pointer'''
 PC = PC()
 PC.PC = 0
@@ -107,11 +108,11 @@ while ((len(ROB)>0) | (PC.PC<len(instructions)) | (ld_sd_mem.busy==1)
     mem(ld_sd_queue, ld_sd_mem, time_ld_sd_mem, results_buffer,
         memory, ROB, cycle)
 
-    '''CDB stage (one CDB: one broadcast per cycle)'''
+    '''WB stage: up to issue_width results broadcast per cycle'''
     wb(cdb, rat_int, rat_fp,
        rs_int_adder, rs_fp_adder, rs_fp_multi,
        ld_sd_queue, ROB, cycle,
-       results_buffer)
+       results_buffer, issue_width)
 
     '''COMMIT stage: up to issue_width instructions, in order'''
     commit(ROB, reg_int, reg_fp, cycle, instructions, issue_width)
